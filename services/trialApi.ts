@@ -74,6 +74,15 @@ export const trialApi = {
       }),
     }),
 
+  verifyOtp: (payload: VerifyOtpPayload) =>
+    request<{ access_token: string; refresh_token: string; tenant_id: string; subscription_tier: string }>(`/api/v1/auth/trial/verify-otp`, {
+      method: 'POST',
+      body: JSON.stringify({
+        company_email: payload.email,
+        otp: payload.otp,
+      }),
+    }),
+
   getTrialStatus: () =>
     request<{ active: boolean; daysLeft: number; plan: TrialPlan; expiresAt: string }>(`/api/v1/trial/status`, {
       method: 'GET',
