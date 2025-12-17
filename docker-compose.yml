@@ -58,24 +58,14 @@ services:
       context: ./backend
       dockerfile: Dockerfile
     container_name: inboxgrove_api
+    env_file:
+      - .env
     environment:
-      DATABASE_URL: postgresql://inboxgrove_user:secure_password_change_me@postgres:5432/inboxgrove
-      REDIS_URL: redis://redis:6379/0
-      CELERY_BROKER_URL: redis://redis:6379/1
-      CELERY_RESULT_BACKEND: redis://redis:6379/2
-      KUMOMTA_API_URL: http://kumo:8008
-      CLOUDFLARE_API_TOKEN: dummy_token
-      CLOUDFLARE_ZONE_ID: dummy_zone
-      GOOGLE_CLIENT_ID: dummy_client_id
-      GOOGLE_CLIENT_SECRET: dummy_client_secret
-      SECRET_KEY: change-me-in-production
-      ENCRYPTION_KEY: change-me-aes256-key
-      LOG_LEVEL: INFO
-      MAIL_SMTP_HOST: smtp.example.com
-      MAIL_SMTP_USER: user
-      MAIL_SMTP_PASSWORD: password
-      KUMO_API_KEY: dummy
-      KUMO_PASSWORD: dummy
+      # Override specific values if needed
+      DATABASE_URL: postgresql://${POSTGRES_USER:-inboxgrove_user}:${POSTGRES_PASSWORD:-secure_password_change_me}@postgres:5432/${POSTGRES_DB:-inboxgrove}
+      REDIS_URL: ${REDIS_URL:-redis://redis:6379/0}
+      CELERY_BROKER_URL: ${CELERY_BROKER_URL:-redis://redis:6379/1}
+      CELERY_RESULT_BACKEND: ${CELERY_RESULT_BACKEND:-redis://redis:6379/2}
     volumes:
       - ./backend/app:/app/app
       - ./backend/logs:/app/logs
@@ -94,6 +84,24 @@ services:
     networks:
       - inboxgrove_network
 
+
+  # =========================================================================
+  # Frontend (React + Vite)
+  # =========================================================================
+  frontend:
+    build:
+      context: .
+      dockerfile: Dockerfile
+      args:
+        VITE_API_BASE_URL: ${VITE_API_BASE_URL:-http://94.250.203.249:8002}
+    container_name: inboxgrove_frontend
+    ports:
+      - "3013:3013"
+    depends_on:
+      - api
+    networks:
+      - inboxgrove_network
+    restart: unless-stopped
 
 
   # =========================================================================

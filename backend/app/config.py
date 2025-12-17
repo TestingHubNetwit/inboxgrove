@@ -33,7 +33,12 @@ class Settings(BaseSettings):
     JWT_EXPIRY_MINUTES: int = 1440  # 24 hours
     JWT_REFRESH_EXPIRY_DAYS: int = 7
     CORS_ORIGINS: list[str] = Field(
-        default=["http://localhost:3000", "http://localhost:3013", "http://localhost:5173"],
+        default=[
+            "http://localhost:3000",
+            "http://localhost:3013", 
+            "http://localhost:5173",
+            "http://94.250.203.249:3013"
+        ],
         env="CORS_ORIGINS"
     )
     

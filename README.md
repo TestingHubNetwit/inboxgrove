@@ -1,107 +1,182 @@
-# InboxGrove - Development Setup
+# InboxGrove - Production Ready
 
-## Port Configuration
-- **Frontend (Vite)**: `http://localhost:3013`
-- **Backend (FastAPI)**: `http://localhost:8002`
-- **PostgreSQL**: `localhost:5432`
-- **Redis**: `localhost:6379`
+## Quick Start (Production on Server)
 
-## Quick Start
-
-### Prerequisites
-- Docker & Docker Compose
-- Node.js 18+ and npm
-
-### Running the Application
-
-#### Option 1: Development Mode (Recommended)
-
-**Terminal 1 - Backend Services:**
+### One-Command Deployment
 ```bash
-# Start PostgreSQL, Redis, and API
-docker compose up postgres redis api
+# Clone the repository
+git clone https://github.com/TestingHubNetwit/inboxgrove.git
+cd inboxgrove
+
+# Start everything
+docker compose up -d --build
 ```
 
-**Terminal 2 - Frontend Dev Server:**
-```bash
-# Install dependencies (first time only)
-npm install
+That's it! The application will be available at:
+- **Frontend**: http://94.250.203.249:3013
+- **Backend API**: http://94.250.203.249:8002
+- **API Docs**: http://94.250.203.249:8002/docs
 
-# Start Vite dev server
-npm run dev
-```
+## Configuration
 
-The application will be available at:
-- Frontend: http://localhost:3013
-- Backend API: http://localhost:8002/docs (Swagger UI)
+### Environment Variables
+The `.env` file contains all configuration. Key settings:
 
-#### Option 2: Full Docker Stack
-```bash
-# Start all services
-docker compose up -d
-
-# Frontend still needs to run separately
-npm run dev
-```
-
-### Building for Production
-
-```bash
-# Build frontend
-npm run build
-
-# Preview production build
-npm run preview
-
-# Or serve with a static server
-npx serve -s dist -l 3013
-```
-
-## Configuration Files
-
-### Frontend
-- `vite.config.ts` - Dev server port: 3013
-- `services/trialApi.ts` - API base URL: http://localhost:8002
-
-### Backend
-- `backend/app/config.py` - CORS origins include port 3013
-- `docker-compose.yml` - API service on port 8002
-
-## Environment Variables
-
-Create a `.env` file in the root directory (see `.env.example`):
 ```env
-# Frontend
-VITE_API_BASE_URL=http://localhost:8002
+SERVER_IP=94.250.203.249
+VITE_API_BASE_URL=http://94.250.203.249:8002
 
-# Backend (in docker-compose.yml or backend/.env)
-DATABASE_URL=postgresql://inboxgrove_user:password@postgres:5432/inboxgrove
-REDIS_URL=redis://redis:6379/0
-SECRET_KEY=your-secret-key
-# ... other backend variables
+# Database
+POSTGRES_USER=inboxgrove_user
+POSTGRES_PASSWORD=secure_password_change_in_production
+
+# Security (CHANGE IN PRODUCTION!)
+SECRET_KEY=change-me-in-production-use-strong-random-key
+JWT_SECRET=change-me-in-production-use-strong-random-key
+```
+
+**⚠️ IMPORTANT**: Change the security keys before deploying to production!
+
+### Ports
+- Frontend: `3013`
+- Backend API: `8002`
+- PostgreSQL: `5432` (internal only)
+- Redis: `6379` (internal only)
+
+## Management Commands
+
+```bash
+# View logs
+docker compose logs -f
+
+# View specific service logs
+docker compose logs -f api
+docker compose logs -f frontend
+
+# Restart services
+docker compose restart
+
+# Stop everything
+docker compose down
+
+# Stop and remove volumes (⚠️ deletes database)
+docker compose down -v
+
+# Rebuild and restart
+docker compose up -d --build
+```
+
+## Development Mode (Local)
+
+If you want to run in development mode on your local machine:
+
+```bash
+# Terminal 1 - Backend
+docker compose up postgres redis api
+
+# Terminal 2 - Frontend (with hot reload)
+npm install
+npm run dev
+```
+
+Access at:
+- Frontend: http://localhost:3013
+- Backend: http://localhost:8002
+
+## Architecture
+
+```
+┌─────────────────────────────────────────┐
+│  Frontend (Vite + React)                │
+│  Port: 3013                             │
+│  Container: inboxgrove_frontend         │
+└─────────────────┬───────────────────────┘
+                  │
+                  │ HTTP Requests
+                  ▼
+┌─────────────────────────────────────────┐
+│  Backend API (FastAPI)                  │
+│  Port: 8002                             │
+│  Container: inboxgrove_api              │
+└─────┬───────────────────────────────────┘
+      │
+      ├──► PostgreSQL (port 5432)
+      ├──► Redis (port 6379)
+      └──► Celery Workers
 ```
 
 ## Troubleshooting
 
 ### Port Already in Use
-If port 3013 or 8002 is already in use:
-- Change frontend port in `vite.config.ts`
-- Change backend port mapping in `docker-compose.yml` (e.g., `8003:8000`)
-- Update `services/trialApi.ts` BASE_URL accordingly
+```bash
+# Check what's using the port
+lsof -i :3013
+lsof -i :8002
 
-### CORS Errors
-Ensure `backend/app/config.py` includes your frontend URL in `CORS_ORIGINS`.
+# Kill the process or change ports in .env
+```
 
 ### Database Connection Issues
 ```bash
 # Check if PostgreSQL is running
 docker compose ps postgres
 
-# View logs
+# View PostgreSQL logs
 docker compose logs postgres
+
+# Restart database
+docker compose restart postgres
 ```
 
-## Notes
-- Nginx has been removed from this setup
-- Frontend runs via Vite dev server for development
-- For production, build the frontend and serve with any static file server
+### Frontend Not Loading
+```bash
+# Check frontend logs
+docker compose logs frontend
+
+# Rebuild frontend
+docker compose up -d --build frontend
+```
+
+### API Errors
+```bash
+# Check API logs
+docker compose logs api
+
+# Check if database is ready
+docker compose exec postgres pg_isready
+
+# Restart API
+docker compose restart api
+```
+
+## Security Checklist for Production
+
+- [ ] Change `SECRET_KEY` in `.env`
+- [ ] Change `JWT_SECRET` in `.env`
+- [ ] Change `POSTGRES_PASSWORD` in `.env`
+- [ ] Set up firewall rules (allow only 3013, 8002)
+- [ ] Configure HTTPS/SSL (use reverse proxy like Nginx or Caddy)
+- [ ] Set up backup for PostgreSQL database
+- [ ] Configure monitoring and logging
+
+## Backup & Restore
+
+### Backup Database
+```bash
+docker compose exec postgres pg_dump -U inboxgrove_user inboxgrove > backup.sql
+```
+
+### Restore Database
+```bash
+cat backup.sql | docker compose exec -T postgres psql -U inboxgrove_user inboxgrove
+```
+
+## Updating
+
+```bash
+# Pull latest changes
+git pull origin main
+
+# Rebuild and restart
+docker compose up -d --build
+```
