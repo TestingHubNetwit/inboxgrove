@@ -1,0 +1,3 @@
+FROM ghcr.io/kumocorp/kumomta:latest
+
+WORKDIR /var/spool/kumomta
