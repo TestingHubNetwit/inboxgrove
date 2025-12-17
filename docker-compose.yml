@@ -184,7 +184,7 @@ services:
       - kumo_data:/var/spool/kumomta
       - ./logs/kumo:/var/log/kumomta
     ports:
-      - "25:25"      # SMTP (submission)
+      # - "25:25"      # SMTP (commented - port already in use)
       - "587:587"    # Submission port (STARTTLS)
       - "993:993"    # IMAPS
       - "8008:8008"  # KumoMTA API
