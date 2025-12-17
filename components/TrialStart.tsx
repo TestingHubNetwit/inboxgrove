@@ -104,21 +104,26 @@ const TrialStart: React.FC = () => {
     if (result.data?.refresh_token) {
       localStorage.setItem('refresh_token', result.data.refresh_token);
     }
-    setTrialData({
-      trialId: result.data?.trialId || '',
-      expiresAt: result.data?.expiresAt || new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString()
-    });
-    localStorage.setItem('trialData', JSON.stringify(res.data));
+    const trialInfo = {
+      trialId: result.data?.tenant_id || '',
+      expiresAt: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString()
+    };
+    setTrialData(trialInfo);
+    localStorage.setItem('trialData', JSON.stringify(trialInfo));
     localStorage.setItem('userEmail', email);
-    setStep('success');
-    setTimeout(() => window.location.href = '/dashboard', 2000);
+
+    // Redirect to dashboard immediately
+    window.location.href = '/dashboard';
   };
 
   return (
     <div className="min-h-screen bg-[#0a0a0a] text-slate-50">
       <div className="max-w-3xl mx-auto px-4 sm:px-6 lg:px-8 py-24">
         <motion.div initial={{ opacity: 0, y: 16 }} animate={{ opacity: 1, y: 0 }} className="mb-8">
-          <button onClick={() => history.back()} className="text-slate-400 hover:text-white text-sm">&larr; Back</button>
+          <div className="flex items-center justify-between">
+            <button onClick={() => history.back()} className="text-slate-400 hover:text-white text-sm">&larr; Back</button>
+            <a href="/login" className="text-purple-400 hover:text-purple-300 text-sm font-medium">Already have an account? Login</a>
+          </div>
           <h1 className="mt-4 text-3xl md:text-4xl font-extrabold tracking-tight text-white flex items-center gap-3">
             <Rocket className="text-purple-500" /> Start your 7‑day free trial
           </h1>
