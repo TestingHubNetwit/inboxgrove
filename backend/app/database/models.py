@@ -127,7 +127,7 @@ class Tenant(Base):
     api_calls_this_month = Column(Integer, default=0)
     
     # Metadata
-    metadata = Column(JSONB, default={})
+    extra_metadata = Column(JSONB, default={})
     created_at = Column(DateTime, default=datetime.utcnow)
     updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
     
@@ -225,7 +225,7 @@ class Domain(Base):
     kumo_authorized_at = Column(DateTime, nullable=True)
     
     # Metadata
-    metadata = Column(JSONB, default={})
+    extra_metadata = Column(JSONB, default={})
     created_at = Column(DateTime, default=datetime.utcnow)
     updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
     
@@ -280,7 +280,7 @@ class Inbox(Base):
     blacklist_date = Column(DateTime, nullable=True)
     
     # Metadata
-    metadata = Column(JSONB, default={})
+    extra_metadata = Column(JSONB, default={})
     created_at = Column(DateTime, default=datetime.utcnow)
     updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
     
