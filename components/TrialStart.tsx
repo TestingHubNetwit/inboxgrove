@@ -35,11 +35,16 @@ const TrialStart: React.FC = () => {
       return;
     }
     setLoading(true);
-    
+
     // Call backend to send OTP
-    const result = await trialApi.sendOtp(email);
+    const result = await trialApi.sendOtp({
+      email,
+      plan,
+      billingCycle,
+      acceptTos
+    });
     setLoading(false);
-    
+
     if (!result.ok) {
       // If backend unavailable, continue to OTP step anyway (demo mode)
       if (result.status === 0) {
@@ -50,7 +55,7 @@ const TrialStart: React.FC = () => {
       setError(result.error || 'Failed to send verification code');
       return;
     }
-    
+
     setStep('otp');
     console.log('Verification code sent to:', email);
   };
@@ -63,20 +68,20 @@ const TrialStart: React.FC = () => {
       return;
     }
     setLoading(true);
-    
+
     // Call backend to verify OTP
     const result = await trialApi.verifyOtp({ email, otp });
     setLoading(false);
-    
+
     if (!result.ok) {
       // If network error (backend not running), show demo success
       if (result.status === 0) {
         console.warn('Backend not available, running in demo mode');
         const demoExpiry = new Date();
         demoExpiry.setDate(demoExpiry.getDate() + 7);
-        const demoData = { 
-          trialId: 'demo_' + Math.random().toString(36).substr(2, 9), 
-          expiresAt: demoExpiry.toISOString() 
+        const demoData = {
+          trialId: 'demo_' + Math.random().toString(36).substr(2, 9),
+          expiresAt: demoExpiry.toISOString()
         };
         setTrialData(demoData);
         localStorage.setItem('trialData', JSON.stringify(demoData));
@@ -91,7 +96,7 @@ const TrialStart: React.FC = () => {
       setError(result.error || 'Failed to verify code');
       return;
     }
-    
+
     // Success: store auth token and trial data
     if (result.data?.access_token) {
       localStorage.setItem('access_token', result.data.access_token);
@@ -99,9 +104,9 @@ const TrialStart: React.FC = () => {
     if (result.data?.refresh_token) {
       localStorage.setItem('refresh_token', result.data.refresh_token);
     }
-    setTrialData({ 
-      trialId: result.data?.trialId || '', 
-      expiresAt: result.data?.expiresAt || new Date(Date.now() + 7*24*60*60*1000).toISOString()
+    setTrialData({
+      trialId: result.data?.trialId || '',
+      expiresAt: result.data?.expiresAt || new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString()
     });
     localStorage.setItem('trialData', JSON.stringify(res.data));
     localStorage.setItem('userEmail', email);
@@ -122,139 +127,140 @@ const TrialStart: React.FC = () => {
 
         <div className="grid grid-cols-1 gap-6">
           {step === 'plan' && (
-          <>
-          <div className="bg-slate-900/60 border border-slate-800 rounded-xl p-6">
-            <div className="flex items-center justify-between mb-4">
-              <h2 className="font-bold text-white">Choose a plan</h2>
-              <div className="flex items-center gap-2 text-sm">
-                <span className={billingCycle === 'monthly' ? 'text-white font-semibold' : 'text-slate-400'}>Monthly</span>
-                <button
-                  aria-label="Toggle billing cycle"
-                  onClick={() => setBillingCycle(billingCycle === 'monthly' ? 'yearly' : 'monthly')}
-                  className="relative inline-flex h-6 w-11 items-center rounded-full bg-slate-700"
-                >
-                  <span
-                    className={`inline-block h-4 w-4 transform rounded-full bg-white transition ${billingCycle === 'yearly' ? 'translate-x-6' : 'translate-x-1'}`}
-                  />
-                </button>
-                <span className={billingCycle === 'yearly' ? 'text-white font-semibold' : 'text-slate-400'}>Yearly <span className="text-emerald-400">(save 20%)</span></span>
-              </div>
-            </div>
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-              {basePlans.map(p => {
-                const yearly = Math.round(p.monthly * 12 * 0.8); // 20% off yearly
-                const active = plan === p.key;
-                return (
-                <button
-                  key={p.key}
-                  onClick={() => setPlan(p.key)}
-                  className={`text-left p-4 rounded-lg border transition-all ${active ? 'border-purple-500 bg-purple-500/10 shadow-[0_0_20px_rgba(139,92,246,0.3)]' : 'border-slate-800 bg-slate-900 hover:bg-slate-800'}`}
-                >
-                  <div className="flex items-center justify-between">
-                    <div>
-                      <div className="font-bold text-white">{p.name}</div>
-                      <div className="text-sm text-slate-400 mt-1">{p.desc}</div>
-                    </div>
-                    <div className="text-right">
-                      {billingCycle === 'monthly' ? (
-                        <div className="text-white font-bold">${p.monthly}/mo</div>
-                      ) : (
-                        <>
-                          <div className="text-white font-bold">${yearly}/yr</div>
-                          <div className="text-xs text-emerald-400">≈ ${(yearly/12).toFixed(2)}/mo</div>
-                        </>
-                      )}
-                    </div>
+            <>
+              <div className="bg-slate-900/60 border border-slate-800 rounded-xl p-6">
+                <div className="flex items-center justify-between mb-4">
+                  <h2 className="font-bold text-white">Choose a plan</h2>
+                  <div className="flex items-center gap-2 text-sm">
+                    <span className={billingCycle === 'monthly' ? 'text-white font-semibold' : 'text-slate-400'}>Monthly</span>
+                    <button
+                      aria-label="Toggle billing cycle"
+                      onClick={() => setBillingCycle(billingCycle === 'monthly' ? 'yearly' : 'monthly')}
+                      className="relative inline-flex h-6 w-11 items-center rounded-full bg-slate-700"
+                    >
+                      <span
+                        className={`inline-block h-4 w-4 transform rounded-full bg-white transition ${billingCycle === 'yearly' ? 'translate-x-6' : 'translate-x-1'}`}
+                      />
+                    </button>
+                    <span className={billingCycle === 'yearly' ? 'text-white font-semibold' : 'text-slate-400'}>Yearly <span className="text-emerald-400">(save 20%)</span></span>
                   </div>
-                </button>
-              );})}
-            </div>
-          </div>
+                </div>
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                  {basePlans.map(p => {
+                    const yearly = Math.round(p.monthly * 12 * 0.8); // 20% off yearly
+                    const active = plan === p.key;
+                    return (
+                      <button
+                        key={p.key}
+                        onClick={() => setPlan(p.key)}
+                        className={`text-left p-4 rounded-lg border transition-all ${active ? 'border-purple-500 bg-purple-500/10 shadow-[0_0_20px_rgba(139,92,246,0.3)]' : 'border-slate-800 bg-slate-900 hover:bg-slate-800'}`}
+                      >
+                        <div className="flex items-center justify-between">
+                          <div>
+                            <div className="font-bold text-white">{p.name}</div>
+                            <div className="text-sm text-slate-400 mt-1">{p.desc}</div>
+                          </div>
+                          <div className="text-right">
+                            {billingCycle === 'monthly' ? (
+                              <div className="text-white font-bold">${p.monthly}/mo</div>
+                            ) : (
+                              <>
+                                <div className="text-white font-bold">${yearly}/yr</div>
+                                <div className="text-xs text-emerald-400">≈ ${(yearly / 12).toFixed(2)}/mo</div>
+                              </>
+                            )}
+                          </div>
+                        </div>
+                      </button>
+                    );
+                  })}
+                </div>
+              </div>
 
-          <form onSubmit={sendOtp} className="bg-slate-900/60 border border-slate-800 rounded-xl p-6 space-y-5">
-            {error && (
-              <div className="rounded-lg border border-red-500/30 bg-red-500/10 text-red-200 px-4 py-3">{error}</div>
-            )}
-            <div>
-              <label className="block text-sm font-semibold text-slate-300 mb-2">Work email</label>
-              <input
-                type="email"
-                required
-                value={email}
-                onChange={(e) => setEmail(e.target.value)}
-                placeholder="you@company.com"
-                className="w-full bg-slate-950 border border-slate-800 rounded-lg px-4 py-3 text-white placeholder-slate-600 focus:outline-none focus:ring-2 focus:ring-purple-500/60"
-              />
-            </div>
-            <div className="flex items-start gap-3">
-              <input id="tos" type="checkbox" checked={acceptTos} onChange={(e) => setAcceptTos(e.target.checked)} className="mt-1 w-4 h-4 rounded border-slate-600 bg-slate-800 text-purple-500 focus:ring-0" />
-              <label htmlFor="tos" className="text-sm text-slate-300">I agree to the <a href="#" className="text-purple-400 hover:text-purple-300">Terms of Service</a> and <a href="#" className="text-purple-400 hover:text-purple-300">Privacy Policy</a>.</label>
-            </div>
-            <button
-              type="submit"
-              disabled={loading}
-              className="w-full py-3 rounded-lg font-bold text-white bg-gradient-to-r from-purple-600 to-blue-600 hover:from-purple-500 hover:to-blue-500 shadow-lg shadow-purple-500/30 flex items-center justify-center gap-2 disabled:opacity-60"
-            >
-              <CreditCard size={18} /> {loading ? 'Sending Code…' : 'Send Verification Code'}
-            </button>
-            <div className="text-xs text-slate-500 flex items-center gap-2">
-              <Shield size={14} className="text-slate-400" /> Secure. No charges until trial ends.
-            </div>
-          </form>
-          </>
+              <form onSubmit={sendOtp} className="bg-slate-900/60 border border-slate-800 rounded-xl p-6 space-y-5">
+                {error && (
+                  <div className="rounded-lg border border-red-500/30 bg-red-500/10 text-red-200 px-4 py-3">{error}</div>
+                )}
+                <div>
+                  <label className="block text-sm font-semibold text-slate-300 mb-2">Work email</label>
+                  <input
+                    type="email"
+                    required
+                    value={email}
+                    onChange={(e) => setEmail(e.target.value)}
+                    placeholder="you@company.com"
+                    className="w-full bg-slate-950 border border-slate-800 rounded-lg px-4 py-3 text-white placeholder-slate-600 focus:outline-none focus:ring-2 focus:ring-purple-500/60"
+                  />
+                </div>
+                <div className="flex items-start gap-3">
+                  <input id="tos" type="checkbox" checked={acceptTos} onChange={(e) => setAcceptTos(e.target.checked)} className="mt-1 w-4 h-4 rounded border-slate-600 bg-slate-800 text-purple-500 focus:ring-0" />
+                  <label htmlFor="tos" className="text-sm text-slate-300">I agree to the <a href="#" className="text-purple-400 hover:text-purple-300">Terms of Service</a> and <a href="#" className="text-purple-400 hover:text-purple-300">Privacy Policy</a>.</label>
+                </div>
+                <button
+                  type="submit"
+                  disabled={loading}
+                  className="w-full py-3 rounded-lg font-bold text-white bg-gradient-to-r from-purple-600 to-blue-600 hover:from-purple-500 hover:to-blue-500 shadow-lg shadow-purple-500/30 flex items-center justify-center gap-2 disabled:opacity-60"
+                >
+                  <CreditCard size={18} /> {loading ? 'Sending Code…' : 'Send Verification Code'}
+                </button>
+                <div className="text-xs text-slate-500 flex items-center gap-2">
+                  <Shield size={14} className="text-slate-400" /> Secure. No charges until trial ends.
+                </div>
+              </form>
+            </>
           )}
 
           {step === 'otp' && (
-          <form onSubmit={verifyOtp} className="bg-slate-900/60 border border-slate-800 rounded-xl p-6 space-y-5">
-            {error && (
-              <div className="rounded-lg border border-red-500/30 bg-red-500/10 text-red-200 px-4 py-3">{error}</div>
-            )}
-            <div className="text-center mb-4">
-              <div className="text-white font-bold text-lg mb-2">Check your email</div>
-              <div className="text-slate-400 text-sm">We sent a 6-digit code to <span className="text-white">{email}</span></div>
-            </div>
-            <div>
-              <label className="block text-sm font-semibold text-slate-300 mb-2">Verification Code</label>
-              <input
-                type="text"
-                required
-                maxLength={6}
-                value={otp}
-                onChange={(e) => setOtp(e.target.value.replace(/\D/g, ''))}
-                placeholder="000000"
-                className="w-full bg-slate-950 border border-slate-800 rounded-lg px-4 py-3 text-white text-center text-2xl tracking-widest font-mono placeholder-slate-600 focus:outline-none focus:ring-2 focus:ring-purple-500/60"
-              />
-            </div>
-            <button
-              type="submit"
-              disabled={loading || otp.length !== 6}
-              className="w-full py-3 rounded-lg font-bold text-white bg-gradient-to-r from-purple-600 to-blue-600 hover:from-purple-500 hover:to-blue-500 shadow-lg shadow-purple-500/30 flex items-center justify-center gap-2 disabled:opacity-60"
-            >
-              <CheckCircle2 size={18} /> {loading ? 'Verifying…' : 'Verify & Start Trial'}
-            </button>
-            <button
-              type="button"
-              onClick={() => setStep('plan')}
-              className="w-full py-2 text-slate-400 hover:text-white text-sm"
-            >
-              ← Change email or plan
-            </button>
-          </form>
+            <form onSubmit={verifyOtp} className="bg-slate-900/60 border border-slate-800 rounded-xl p-6 space-y-5">
+              {error && (
+                <div className="rounded-lg border border-red-500/30 bg-red-500/10 text-red-200 px-4 py-3">{error}</div>
+              )}
+              <div className="text-center mb-4">
+                <div className="text-white font-bold text-lg mb-2">Check your email</div>
+                <div className="text-slate-400 text-sm">We sent a 6-digit code to <span className="text-white">{email}</span></div>
+              </div>
+              <div>
+                <label className="block text-sm font-semibold text-slate-300 mb-2">Verification Code</label>
+                <input
+                  type="text"
+                  required
+                  maxLength={6}
+                  value={otp}
+                  onChange={(e) => setOtp(e.target.value.replace(/\D/g, ''))}
+                  placeholder="000000"
+                  className="w-full bg-slate-950 border border-slate-800 rounded-lg px-4 py-3 text-white text-center text-2xl tracking-widest font-mono placeholder-slate-600 focus:outline-none focus:ring-2 focus:ring-purple-500/60"
+                />
+              </div>
+              <button
+                type="submit"
+                disabled={loading || otp.length !== 6}
+                className="w-full py-3 rounded-lg font-bold text-white bg-gradient-to-r from-purple-600 to-blue-600 hover:from-purple-500 hover:to-blue-500 shadow-lg shadow-purple-500/30 flex items-center justify-center gap-2 disabled:opacity-60"
+              >
+                <CheckCircle2 size={18} /> {loading ? 'Verifying…' : 'Verify & Start Trial'}
+              </button>
+              <button
+                type="button"
+                onClick={() => setStep('plan')}
+                className="w-full py-2 text-slate-400 hover:text-white text-sm"
+              >
+                ← Change email or plan
+              </button>
+            </form>
           )}
 
           {step === 'success' && trialData && (
-          <div className="bg-slate-900/60 border border-slate-800 rounded-xl p-8 text-center">
-            <div className="w-20 h-20 bg-emerald-500/20 rounded-full flex items-center justify-center mx-auto mb-4">
-              <CheckCircle2 className="text-emerald-400" size={40} />
+            <div className="bg-slate-900/60 border border-slate-800 rounded-xl p-8 text-center">
+              <div className="w-20 h-20 bg-emerald-500/20 rounded-full flex items-center justify-center mx-auto mb-4">
+                <CheckCircle2 className="text-emerald-400" size={40} />
+              </div>
+              <h2 className="text-2xl font-bold text-white mb-2">Welcome aboard! 🎉</h2>
+              <p className="text-slate-400 mb-6">
+                Your 7-day trial is active. Redirecting to your dashboard...
+              </p>
+              <div className="text-sm text-slate-500">
+                Trial ID: {trialData.trialId}
+              </div>
             </div>
-            <h2 className="text-2xl font-bold text-white mb-2">Welcome aboard! 🎉</h2>
-            <p className="text-slate-400 mb-6">
-              Your 7-day trial is active. Redirecting to your dashboard...
-            </p>
-            <div className="text-sm text-slate-500">
-              Trial ID: {trialData.trialId}
-            </div>
-          </div>
           )}
         </div>
       </div>
