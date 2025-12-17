@@ -252,6 +252,182 @@ async def refresh_token(
         )
 
 
+# ============================================================================
+# Trial Registration Endpoints (OTP-based)
+# ============================================================================
+
+class TrialSendOTPRequest(BaseModel):
+    """Trial registration - send OTP request."""
+    company_name: str
+    company_email: EmailStr
+    company_website: Optional[str] = None
+
+
+class TrialVerifyOTPRequest(BaseModel):
+    """Trial registration - verify OTP request."""
+    company_email: EmailStr
+    otp: str
+
+
+class OTPResponse(BaseModel):
+    """OTP sent response."""
+    message: str
+    email: str
+
+
+# In-memory OTP storage (use Redis in production)
+_otp_store = {}
+
+
+@router.post("/trial/send-otp", response_model=OTPResponse)
+async def trial_send_otp(
+    request: TrialSendOTPRequest,
+    db: Session = Depends(get_db)
+):
+    """
+    Send OTP for trial registration.
+    
+    For demo purposes, OTP is always "123456".
+    In production, generate random OTP and send via email.
+    """
+    try:
+        # Check if email already registered
+        existing = db.query(Tenant).filter(
+            Tenant.company_email == request.company_email
+        ).first()
+        
+        if existing:
+            raise HTTPException(
+                status_code=status.HTTP_409_CONFLICT,
+                detail="Email already registered"
+            )
+        
+        # Generate OTP (for demo, always use 123456)
+        otp = "123456"
+        
+        # Store OTP with company details (expires in 10 minutes)
+        _otp_store[request.company_email] = {
+            "otp": otp,
+            "company_name": request.company_name,
+            "company_website": request.company_website,
+            "expires_at": datetime.utcnow() + timedelta(minutes=10)
+        }
+        
+        # TODO: Send OTP via email using SendGrid/SMTP
+        # For now, just return success (OTP is always 123456 for demo)
+        
+        return OTPResponse(
+            message="OTP sent successfully. Use 123456 for demo.",
+            email=request.company_email
+        )
+    
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=str(e)
+        )
+
+
+@router.post("/trial/verify-otp", response_model=TokenResponse, status_code=status.HTTP_201_CREATED)
+async def trial_verify_otp(
+    request: TrialVerifyOTPRequest,
+    db: Session = Depends(get_db)
+):
+    """
+    Verify OTP and create trial account.
+    
+    On successful verification:
+    1. Create tenant account
+    2. Auto-create 7-day trial
+    3. Return JWT tokens
+    """
+    try:
+        # Check if OTP exists
+        if request.company_email not in _otp_store:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="OTP not found or expired. Please request a new OTP."
+            )
+        
+        stored_data = _otp_store[request.company_email]
+        
+        # Check if OTP expired
+        if datetime.utcnow() > stored_data["expires_at"]:
+            del _otp_store[request.company_email]
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="OTP expired. Please request a new OTP."
+            )
+        
+        # Verify OTP
+        if request.otp != stored_data["otp"]:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="Invalid OTP"
+            )
+        
+        # Check if tenant already exists (double-check)
+        existing = db.query(Tenant).filter(
+            Tenant.company_email == request.company_email
+        ).first()
+        
+        if existing:
+            # Clean up OTP
+            del _otp_store[request.company_email]
+            raise HTTPException(
+                status_code=status.HTTP_409_CONFLICT,
+                detail="Email already registered"
+            )
+        
+        # Create tenant
+        tenant = Tenant(
+            company_name=stored_data["company_name"],
+            company_email=request.company_email,
+            company_website=stored_data.get("company_website"),
+        )
+        
+        db.add(tenant)
+        db.flush()
+        
+        # Create trial
+        SubscriptionService.create_trial(tenant, db)
+        
+        # Clean up OTP
+        del _otp_store[request.company_email]
+        
+        # Create JWT tokens
+        access_token = _create_token(
+            tenant_id=str(tenant.id),
+            expires_delta=timedelta(minutes=settings.JWT_EXPIRY_MINUTES)
+        )
+        
+        refresh_token = _create_token(
+            tenant_id=str(tenant.id),
+            expires_delta=timedelta(days=settings.JWT_REFRESH_EXPIRY_DAYS),
+            token_type="refresh"
+        )
+        
+        db.commit()
+        
+        return TokenResponse(
+            access_token=access_token,
+            refresh_token=refresh_token,
+            tenant_id=str(tenant.id),
+            subscription_tier=tenant.subscription_tier.value
+        )
+    
+    except HTTPException:
+        raise
+    except Exception as e:
+        db.rollback()
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=str(e)
+        )
+
+
 def _create_token(
     tenant_id: str,
     expires_delta: timedelta,
