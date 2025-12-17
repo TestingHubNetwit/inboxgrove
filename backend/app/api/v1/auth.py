@@ -302,8 +302,8 @@ async def trial_send_otp(
                 detail="Email already registered"
             )
         
-        # Generate OTP (for demo, always use 123456)
-        otp = "123456"
+        # Generate OTP (for demo, always use 000000)
+        otp = "000000"
         
         # Store OTP with company details (expires in 10 minutes)
         _otp_store[request.company_email] = {
@@ -314,10 +314,10 @@ async def trial_send_otp(
         }
         
         # TODO: Send OTP via email using SendGrid/SMTP
-        # For now, just return success (OTP is always 123456 for demo)
+        # For now, just return success (OTP is always 000000 for demo)
         
         return OTPResponse(
-            message="OTP sent successfully. Use 123456 for demo.",
+            message="OTP sent successfully. Use 000000 for demo.",
             email=request.company_email
         )
     
