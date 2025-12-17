@@ -64,16 +64,14 @@ export const trialApi = {
       body: JSON.stringify(payload),
     }),
 
-  sendOtp: (email: string) =>
-    request<{ message: string }>(`/api/v1/auth/trial/send-otp`, {
+  sendOtp: (payload: StartTrialPayload) =>
+    request<{ message: string; email: string }>(`/api/v1/auth/trial/send-otp`, {
       method: 'POST',
-      body: JSON.stringify({ email }),
-    }),
-
-  verifyOtp: (payload: VerifyOtpPayload) =>
-    request<{ access_token: string; refresh_token: string; trialId: string; expiresAt: string }>(`/api/v1/auth/trial/verify-otp`, {
-      method: 'POST',
-      body: JSON.stringify(payload),
+      body: JSON.stringify({
+        company_name: payload.email.split('@')[0], // Use email prefix as company name for now
+        company_email: payload.email,
+        company_website: '', // Optional field
+      }),
     }),
 
   getTrialStatus: () =>
