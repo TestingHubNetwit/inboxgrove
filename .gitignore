@@ -8,9 +8,7 @@ __pycache__/
 pip-log.txt
 pip-delete-this-directory.txt
 
-# Environment
-.env.local
-.env.*.local
+
 
 # Build outputs
 dist/
