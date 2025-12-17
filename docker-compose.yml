@@ -198,12 +198,8 @@ services:
       interval: 15s
       timeout: 5s
       retries: 3
-    # Run as non-root for security
-    user: "kumo:kumo"
-    cap_drop:
-      - ALL
-    cap_add:
-      - NET_BIND_SERVICE
+    networks:
+      - inboxgrove_network
 
   # =========================================================================
   # Prometheus Monitoring (Optional)

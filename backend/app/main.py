@@ -98,6 +98,7 @@ def include_routes():
 include_routes()
 
 
+# run the backend on port 8000
 if __name__ == "__main__":
     import uvicorn
     uvicorn.run(
