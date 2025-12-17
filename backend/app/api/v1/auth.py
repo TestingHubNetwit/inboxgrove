@@ -285,9 +285,13 @@ async def trial_send_otp(
     db: Session = Depends(get_db)
 ):
     """
-    Send OTP for trial registration.
+    Send OTP for trial registration or login.
     
-    For demo purposes, OTP is always "123456".
+    Smart flow:
+    - If email already registered: Send OTP for login
+    - If email is new: Send OTP for registration
+    
+    For demo purposes, OTP is always "000000".
     In production, generate random OTP and send via email.
     """
     try:
@@ -295,12 +299,6 @@ async def trial_send_otp(
         existing = db.query(Tenant).filter(
             Tenant.company_email == request.company_email
         ).first()
-        
-        if existing:
-            raise HTTPException(
-                status_code=status.HTTP_409_CONFLICT,
-                detail="Email already registered"
-            )
         
         # Generate OTP (for demo, always use 000000)
         otp = "000000"
@@ -310,16 +308,23 @@ async def trial_send_otp(
             "otp": otp,
             "company_name": request.company_name,
             "company_website": request.company_website,
+            "is_existing_user": existing is not None,  # Flag to track if user exists
             "expires_at": datetime.utcnow() + timedelta(minutes=10)
         }
         
         # TODO: Send OTP via email using SendGrid/SMTP
         # For now, just return success (OTP is always 000000 for demo)
         
-        return OTPResponse(
-            message="OTP sent successfully. Use 000000 for demo.",
-            email=request.company_email
-        )
+        if existing:
+            return OTPResponse(
+                message="OTP sent successfully. Use 000000 to login.",
+                email=request.company_email
+            )
+        else:
+            return OTPResponse(
+                message="OTP sent successfully. Use 000000 for demo.",
+                email=request.company_email
+            )
     
     except HTTPException:
         raise
@@ -336,12 +341,11 @@ async def trial_verify_otp(
     db: Session = Depends(get_db)
 ):
     """
-    Verify OTP and create trial account.
+    Verify OTP and login or create trial account.
     
-    On successful verification:
-    1. Create tenant account
-    2. Auto-create 7-day trial
-    3. Return JWT tokens
+    Smart flow:
+    - If user exists: Login and return tokens
+    - If user is new: Create account with trial and return tokens
     """
     try:
         # Check if OTP exists
@@ -368,55 +372,98 @@ async def trial_verify_otp(
                 detail="Invalid OTP"
             )
         
-        # Check if tenant already exists (double-check)
-        existing = db.query(Tenant).filter(
+        # Check if this is an existing user (login) or new user (registration)
+        is_existing_user = stored_data.get("is_existing_user", False)
+        
+        # Get or create tenant
+        tenant = db.query(Tenant).filter(
             Tenant.company_email == request.company_email
         ).first()
         
-        if existing:
+        if is_existing_user and tenant:
+            # EXISTING USER - LOGIN FLOW
             # Clean up OTP
             del _otp_store[request.company_email]
-            raise HTTPException(
-                status_code=status.HTTP_409_CONFLICT,
-                detail="Email already registered"
+            
+            # Check if tenant is suspended
+            if tenant.is_suspended:
+                raise HTTPException(
+                    status_code=status.HTTP_403_FORBIDDEN,
+                    detail="Account suspended"
+                )
+            
+            # Create JWT tokens for login
+            access_token = _create_token(
+                tenant_id=str(tenant.id),
+                expires_delta=timedelta(minutes=settings.JWT_EXPIRY_MINUTES)
+            )
+            
+            refresh_token = _create_token(
+                tenant_id=str(tenant.id),
+                expires_delta=timedelta(days=settings.JWT_REFRESH_EXPIRY_DAYS),
+                token_type="refresh"
+            )
+            
+            return TokenResponse(
+                access_token=access_token,
+                refresh_token=refresh_token,
+                tenant_id=str(tenant.id),
+                subscription_tier=tenant.subscription_tier.value
             )
         
-        # Create tenant
-        tenant = Tenant(
-            company_name=stored_data["company_name"],
-            company_email=request.company_email,
-            company_website=stored_data.get("company_website"),
-        )
+        elif not is_existing_user:
+            # NEW USER - REGISTRATION FLOW
+            if tenant:
+                # User was created between send-otp and verify-otp
+                del _otp_store[request.company_email]
+                raise HTTPException(
+                    status_code=status.HTTP_409_CONFLICT,
+                    detail="Email already registered"
+                )
+            
+            # Create new tenant
+            tenant = Tenant(
+                company_name=stored_data["company_name"],
+                company_email=request.company_email,
+                company_website=stored_data.get("company_website"),
+            )
+            
+            db.add(tenant)
+            db.flush()
+            
+            # Create trial
+            SubscriptionService.create_trial(tenant, db)
+            
+            # Clean up OTP
+            del _otp_store[request.company_email]
+            
+            # Create JWT tokens
+            access_token = _create_token(
+                tenant_id=str(tenant.id),
+                expires_delta=timedelta(minutes=settings.JWT_EXPIRY_MINUTES)
+            )
+            
+            refresh_token = _create_token(
+                tenant_id=str(tenant.id),
+                expires_delta=timedelta(days=settings.JWT_REFRESH_EXPIRY_DAYS),
+                token_type="refresh"
+            )
+            
+            db.commit()
+            
+            return TokenResponse(
+                access_token=access_token,
+                refresh_token=refresh_token,
+                tenant_id=str(tenant.id),
+                subscription_tier=tenant.subscription_tier.value
+            )
         
-        db.add(tenant)
-        db.flush()
-        
-        # Create trial
-        SubscriptionService.create_trial(tenant, db)
-        
-        # Clean up OTP
-        del _otp_store[request.company_email]
-        
-        # Create JWT tokens
-        access_token = _create_token(
-            tenant_id=str(tenant.id),
-            expires_delta=timedelta(minutes=settings.JWT_EXPIRY_MINUTES)
-        )
-        
-        refresh_token = _create_token(
-            tenant_id=str(tenant.id),
-            expires_delta=timedelta(days=settings.JWT_REFRESH_EXPIRY_DAYS),
-            token_type="refresh"
-        )
-        
-        db.commit()
-        
-        return TokenResponse(
-            access_token=access_token,
-            refresh_token=refresh_token,
-            tenant_id=str(tenant.id),
-            subscription_tier=tenant.subscription_tier.value
-        )
+        else:
+            # Edge case: shouldn't happen
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="Invalid state. Please try again."
+            )
     
     except HTTPException:
         raise
