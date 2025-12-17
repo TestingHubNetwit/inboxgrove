@@ -5,18 +5,20 @@ Re-exports commonly used auth functions from security module.
 
 from app.utils.security import (
     get_current_tenant,
-    get_current_user,
-    create_access_token,
-    create_refresh_token,
+    hash_password,
     verify_password,
-    get_password_hash,
+    generate_api_key,
+    hash_api_key,
+    RateLimiter,
+    SuspensionManager,
 )
 
 __all__ = [
     "get_current_tenant",
-    "get_current_user",
-    "create_access_token",
-    "create_refresh_token",
+    "hash_password",
     "verify_password",
-    "get_password_hash",
+    "generate_api_key",
+    "hash_api_key",
+    "RateLimiter",
+    "SuspensionManager",
 ]
